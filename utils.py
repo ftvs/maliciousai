@@ -1,8 +1,9 @@
 import torch
+import time
 
 class BaseTrainer:
     def __init__(self, model, criterion, optimizer, train_loader, val_loader, device='cpu'):
-        self.model = model
+        self.model = model.to(device)
         self.criterion = criterion  #the loss function
         self.optimizer = optimizer  #the optimizer
         self.train_loader = train_loader  #the train loader
@@ -26,9 +27,12 @@ class BaseTrainer:
         self.model.train()
         device = self.device
         running_loss, correct, total = 0.0, 0, 0
+        start = time.time()
 
         for i, data in enumerate(self.train_loader):
-            print(f"training: {i}")
+            # print(f"training: {i}")
+            # start = time.time()
+
             inputs, labels = data
             inputs, labels = inputs.to(device), labels.to(device)
             self.optimizer.zero_grad()
@@ -36,9 +40,13 @@ class BaseTrainer:
             if self.device != 'cpu':
                 with torch.autocast(device_type="cuda"):
                     outputs = self.model(inputs)
+                    # print(f"output")
                     loss = self.criterion(outputs, labels)
+                    # print(f"loss")
                     loss.backward()
+                    # print(f"backward")
                     self.optimizer.step()
+                    # print("step")
             else:
                 with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
                     outputs = self.model(inputs)
@@ -50,16 +58,22 @@ class BaseTrainer:
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-
+            # print("metrics")
+            # end = time.time()
+            # print(f"Time Taken: {end-start}")
+        
         train_accuracy = correct / total
         train_loss = running_loss / self.num_batches
+        end = time.time()
+        print(f"Time Taken: {end-start}")
+
         return train_loss, train_accuracy
 
     #evaluate on a loader and return the loss and accuracy
     def evaluate(self, loader):
         self.model.eval()
         device = self.device
-        loss, correct, total = 0.0, 0, 0
+        loss, total_loss, correct, total = 0.0, 0.0, 0, 0
 
         with torch.no_grad():
             for data in loader:
@@ -75,13 +89,13 @@ class BaseTrainer:
                         outputs = self.model(inputs)
                         loss = self.criterion(outputs, labels)
 
-                loss += loss.item()
+                total_loss += loss.item()
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
         accuracy = correct / total
-        loss = loss / len(self.val_loader)
+        loss = total_loss / len(loader)
         return loss, accuracy
 
     #return the val_acc, val_loss, be called at the end of each epoch
@@ -100,4 +114,4 @@ def unfreeze(model: torch.nn.Module):
 def _set_freeze(model: torch.nn.Module, freeze: bool):
     ''' Private helper function. Sets model freeze state. '''
     for param in model.parameters():
-        param.requires_grad = freeze
+        param.requires_grad = not freeze

@@ -12,13 +12,17 @@ class CelebDF2(VisionDataset):
     def __init__(
             self,
             root: str,
+            n_frames=int,
             transforms: Optional[Callable] = None,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
     ) -> None:
-        super().__init__(str, transforms, transform, target_transform)
+        super().__init__(root, transforms, transform, target_transform)
+
+        self.n_frames = n_frames  # Fixed number of frames to clip from each video
         set_name = 'Celeb-DF-v2'
         self._data_path = root + '/' + set_name # eg data/Celeb-DF-v2
+
         # read path, verify, throw exception if nonexistent or other problem
         with open(self._data_path + '/List_of_testing_videos.txt',
                   encoding='utf-8') as data:
@@ -42,8 +46,30 @@ class CelebDF2(VisionDataset):
                                             output_format='TCHW', pts_unit='sec') # time, channels, height, width
         class_index = int(label) # get label index
 
+        # Clip frames to the fixed number `n_frames`
+        video = self._clip_frames(video) 
+
         if self.transform is not None:
             video = self.transform(video)
 
+        video = self._convertBCHWtoCBHW(video)
+
         # audio omitted for our purposes
         return video, class_index
+    
+    def _clip_frames(self, frames):
+        """Clip the video frames to a fixed number of frames `n_frames`."""
+        # If the video has more frames than n_frames, clip it to the first `n_frames`
+        if len(frames) > self.n_frames:
+            return frames[:self.n_frames]
+        
+        # If the video has fewer frames than `n_frames`, pad with zeros
+        pad_size = self.n_frames - len(frames)
+        pad_frames = torch.zeros((pad_size, *frames.shape[1:]))  # Create padding frames with same size
+        frames = torch.cat([frames, pad_frames], dim=0)
+        
+        return frames
+    
+    def _convertBCHWtoCBHW(self, vid: torch.Tensor) -> torch.Tensor:
+        """Convert tensor from (B, C, H, W) to (C, B, H, W)"""
+        return vid.permute(1, 0, 2, 3)

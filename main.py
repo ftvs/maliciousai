@@ -60,7 +60,6 @@ class MiniVGG(nn.Module):
         x = self.classifier(x)
         return x
     
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def train_vgg():
     # Define a transform to normalize the data
@@ -99,36 +98,36 @@ def train_vgg():
     trainer = BaseTrainer(model, criterion, optimizer, train_loader, val_loader)
     trainer.fit(num_epochs=1)
 
-def train_s3d(dataset_path,batch_size):
+def train_s3d(dataset_path,batch_size,device,epochs):
     #%%
     model = s3d(weights=S3D_Weights.DEFAULT)
     freeze(model)
     # replace final layer with new one with appropriate num of classes
     model.classifier[1] = nn.Conv3d(1024, 2, kernel_size=1, stride=1)
 
-    class ConvertBCHWtoCBHW(nn.Module):
-        """Convert tensor from (B, C, H, W) to (C, B, H, W)"""
+    # class ConvertBCHWtoCBHW(nn.Module):
+    #     """Convert tensor from (B, C, H, W) to (C, B, H, W)"""
 
-        def forward(self, vid: torch.Tensor) -> torch.Tensor:
-            return vid.permute(1, 0, 2, 3)
+    #     def forward(self, vid: torch.Tensor) -> torch.Tensor:
+    #         return vid.permute(1, 0, 2, 3)
 
     transform = transforms.Compose([
         transforms.ConvertImageDtype(torch.float32),    
         transforms.Normalize(mean=(0.43216, 0.394666, 0.37645),
                             std=(0.22803, 0.22145, 0.216989)),
-        transforms.CenterCrop(256),
-        # transforms.Resize()
-        ConvertBCHWtoCBHW()
+        # transforms.CenterCrop(256),
+        transforms.Resize((256,256))
+        # ConvertBCHWtoCBHW()
     ])
     # transform = S3D_Weights.DEFAULT.transforms()
 
-    dataset = CelebDF2(dataset_path, transform=transform)
+    dataset = CelebDF2(dataset_path, transform=transform, n_frames=180) # 6s @ 30fps = 180 frames
     train_size = int(0.8 * len(dataset))
     test_size = len(dataset) - train_size
     train_data, test_data = random_split(dataset, [train_size, test_size])
 
-    train_loader = DataLoader(train_data, batch_size, pin_memory=True) #, num_workers=4, persistent_workers=True
-    test_loader = DataLoader(test_data, batch_size, pin_memory=True) # , num_workers=4, persistent_workers=True # maybe just split from training
+    train_loader = DataLoader(train_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True) #, num_workers=4, persistent_workers=True
+    test_loader = DataLoader(test_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True) # , num_workers=4, persistent_workers=True # maybe just split from training
 
     first_data, first_labels = next(iter(train_loader))
     # print(first_data)
@@ -140,20 +139,24 @@ def train_s3d(dataset_path,batch_size):
         nn.CrossEntropyLoss(),
         torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9),
         train_loader,
-        test_loader)
+        test_loader,
+        device = device)
 
-    trainer.fit(1)
+    trainer.fit(epochs)
     result = trainer.evaluate(test_loader)
     print('test performance:', result)
 
 
 # Run selected model
-dataset_path = "data"
-batch_size = 1
-train_s3d(dataset_path,batch_size)
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# dataset_path = "data"
+# batch_size = 1
+# epochs = 1
+# train_s3d(dataset_path,batch_size,device,epochs)
 
 # issues:
-# 1. model is not training
-# 2. when batch size more than 1 need to constict the number of frames
+# Resolved 1. model is not training
+# Resolved 2. when batch size more than 1 need to constict the number of frames
 #   - use a collate function to use the minimum/fixed number of frames in batch
-# 3. crop a small amount then resize
+# Resolved 3. crop a small amount then resize
+# 4. train using adversial data like black box attacks (random noise)
