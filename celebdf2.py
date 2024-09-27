@@ -39,7 +39,7 @@ class CelebDF2(VisionDataset):
         # target class and file path eg 1, YouTube-real/00170.mp4
         label, filepath = self._data_info[index][0], self._data_info[index][1]
         video, audio, vid_info = read_video(self._data_path + '/' + filepath,
-                                            output_format='TCHW') # time, channels, height, width
+                                            output_format='TCHW', pts_unit='sec') # time, channels, height, width
         class_index = int(label) # get label index
 
         if self.transform is not None:

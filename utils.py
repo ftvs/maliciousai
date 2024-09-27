@@ -28,6 +28,7 @@ class BaseTrainer:
         running_loss, correct, total = 0.0, 0, 0
 
         for i, data in enumerate(self.train_loader):
+            print(f"training: {i}")
             inputs, labels = data
             inputs, labels = inputs.to(device), labels.to(device)
             self.optimizer.zero_grad()

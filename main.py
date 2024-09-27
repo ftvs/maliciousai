@@ -10,6 +10,8 @@ from torchvision.datasets.utils import download_url
 
 import torchvision.transforms.v2 as transforms
 
+import numpy as np
+
 # custom libraries
 from utils import *
 from celebdf2 import *
@@ -97,9 +99,9 @@ def train_vgg():
     trainer = BaseTrainer(model, criterion, optimizer, train_loader, val_loader)
     trainer.fit(num_epochs=1)
 
-def train_s3d():
+def train_s3d(dataset_path,batch_size):
     #%%
-    model = s3d(S3D_Weights.DEFAULT)
+    model = s3d(weights=S3D_Weights.DEFAULT)
     freeze(model)
     # replace final layer with new one with appropriate num of classes
     model.classifier[1] = nn.Conv3d(1024, 2, kernel_size=1, stride=1)
@@ -114,22 +116,24 @@ def train_s3d():
         transforms.ConvertImageDtype(torch.float32),    
         transforms.Normalize(mean=(0.43216, 0.394666, 0.37645),
                             std=(0.22803, 0.22145, 0.216989)),
-        # transforms.Resize()
         transforms.CenterCrop(256),
+        # transforms.Resize()
         ConvertBCHWtoCBHW()
     ])
     # transform = S3D_Weights.DEFAULT.transforms()
 
-    dataset = CelebDF2('data', transform=transform)
-    batch_size = 1
+    dataset = CelebDF2(dataset_path, transform=transform)
     train_size = int(0.8 * len(dataset))
     test_size = len(dataset) - train_size
     train_data, test_data = random_split(dataset, [train_size, test_size])
 
-    train_loader = DataLoader(train_data, batch_size)
-    test_loader = DataLoader(test_data, batch_size) # maybe just split from training
+    train_loader = DataLoader(train_data, batch_size, pin_memory=True) #, num_workers=4, persistent_workers=True
+    test_loader = DataLoader(test_data, batch_size, pin_memory=True) # , num_workers=4, persistent_workers=True # maybe just split from training
 
-    print(next(iter(train_loader)))
+    first_data, first_labels = next(iter(train_loader))
+    # print(first_data)
+    print(f"Input Shape: {first_data.shape}")
+    print(f"label Shape: {first_labels.shape}")
 
     trainer = BaseTrainer(
         model,
@@ -142,4 +146,14 @@ def train_s3d():
     result = trainer.evaluate(test_loader)
     print('test performance:', result)
 
-train_s3d()
+
+# Run selected model
+dataset_path = "data"
+batch_size = 1
+train_s3d(dataset_path,batch_size)
+
+# issues:
+# 1. model is not training
+# 2. when batch size more than 1 need to constict the number of frames
+#   - use a collate function to use the minimum/fixed number of frames in batch
+# 3. crop a small amount then resize
