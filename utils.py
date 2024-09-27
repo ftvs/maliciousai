@@ -70,3 +70,16 @@ class BaseTrainer:
     def validate_one_epoch(self):
         val_loss, val_accuracy = self.evaluate(self.val_loader)
         return val_loss, val_accuracy
+    
+def freeze(model: torch.nn.Module):
+    ''' Disable model training '''
+    _set_freeze(model, freeze=True)
+
+def unfreeze(model: torch.nn.Module):
+    ''' Enable model training '''
+    _set_freeze(model, freeze=False)
+
+def _set_freeze(model: torch.nn.Module, freeze: bool):
+    ''' Private helper function. Sets model freeze state. '''
+    for param in model.parameters():
+        param.requires_grad = freeze

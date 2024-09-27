@@ -2,10 +2,17 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
-import torchvision.transforms as transforms
 
-# custom library
-from utils import BaseTrainer
+from torch.utils.data import DataLoader, random_split
+
+from torchvision.models.video import s3d, S3D_Weights
+from torchvision.datasets.utils import download_url
+
+import torchvision.transforms.v2 as transforms
+
+# custom libraries
+from utils import *
+from celebdf2 import *
 
 class MiniVGG(nn.Module):
     def __init__(self, n_classes=10):
@@ -53,38 +60,86 @@ class MiniVGG(nn.Module):
     
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Define a transform to normalize the data
-transform = transforms.Compose(
-    [transforms.ToTensor(),
-     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+def train_vgg():
+    # Define a transform to normalize the data
+    transform = transforms.Compose(
+        [transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
-# Download and load the training set
-train_set = torchvision.datasets.CIFAR10(root='./data', train=True,
+    # Download and load the training set
+    train_set = torchvision.datasets.CIFAR10(root='./data', train=True,
+                                            download=True, transform=transform)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=64,
+                                            shuffle=True)
+
+    # Download and load the test set
+    test_set = torchvision.datasets.CIFAR10(root='./data', train=False,
                                         download=True, transform=transform)
-train_loader = torch.utils.data.DataLoader(train_set, batch_size=64,
-                                          shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=64,
+                                            shuffle=False)
+    # Split the training set into two halves
+    train_size = 5000
+    val_size = 5000
+    #split into three subsets train, valid, and the rest
+    train_subset, val_subset, _ = torch.utils.data.random_split(train_set, [train_size, val_size, len(train_set) - train_size - val_size])
 
-# Download and load the test set
-test_set = torchvision.datasets.CIFAR10(root='./data', train=False,
-                                       download=True, transform=transform)
-test_loader = torch.utils.data.DataLoader(test_set, batch_size=64,
-                                         shuffle=False)
-# Split the training set into two halves
-train_size = 5000
-val_size = 5000
-#split into three subsets train, valid, and the rest
-train_subset, val_subset, _ = torch.utils.data.random_split(train_set, [train_size, val_size, len(train_set) - train_size - val_size])
+    # Create data loaders for the training and validation sets
+    train_loader = torch.utils.data.DataLoader(train_subset, batch_size=64,
+                                            shuffle=True)
+    val_loader = torch.utils.data.DataLoader(val_subset, batch_size=64,
+                                                shuffle=False)
 
-# Create data loaders for the training and validation sets
-train_loader = torch.utils.data.DataLoader(train_subset, batch_size=64,
-                                          shuffle=True)
-val_loader = torch.utils.data.DataLoader(val_subset, batch_size=64,
-                                               shuffle=False)
+    model = MiniVGG()
+    model = model.to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-model = MiniVGG()
-model = model.to(device)
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+    trainer = BaseTrainer(model, criterion, optimizer, train_loader, val_loader)
+    trainer.fit(num_epochs=1)
 
-trainer = BaseTrainer(model, criterion, optimizer, train_loader, val_loader)
-trainer.fit(num_epochs=1)
+def train_s3d():
+    #%%
+    model = s3d(S3D_Weights.DEFAULT)
+    freeze(model)
+    # replace final layer with new one with appropriate num of classes
+    model.classifier[1] = nn.Conv3d(1024, 2, kernel_size=1, stride=1)
+
+    class ConvertBCHWtoCBHW(nn.Module):
+        """Convert tensor from (B, C, H, W) to (C, B, H, W)"""
+
+        def forward(self, vid: torch.Tensor) -> torch.Tensor:
+            return vid.permute(1, 0, 2, 3)
+
+    transform = transforms.Compose([
+        transforms.ConvertImageDtype(torch.float32),    
+        transforms.Normalize(mean=(0.43216, 0.394666, 0.37645),
+                            std=(0.22803, 0.22145, 0.216989)),
+        # transforms.Resize()
+        transforms.CenterCrop(256),
+        ConvertBCHWtoCBHW()
+    ])
+    # transform = S3D_Weights.DEFAULT.transforms()
+
+    dataset = CelebDF2('data', transform=transform)
+    batch_size = 1
+    train_size = int(0.8 * len(dataset))
+    test_size = len(dataset) - train_size
+    train_data, test_data = random_split(dataset, [train_size, test_size])
+
+    train_loader = DataLoader(train_data, batch_size)
+    test_loader = DataLoader(test_data, batch_size) # maybe just split from training
+
+    print(next(iter(train_loader)))
+
+    trainer = BaseTrainer(
+        model,
+        nn.CrossEntropyLoss(),
+        torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9),
+        train_loader,
+        test_loader)
+
+    trainer.fit(1)
+    result = trainer.evaluate(test_loader)
+    print('test performance:', result)
+
+train_s3d()
