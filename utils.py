@@ -31,10 +31,19 @@ class BaseTrainer:
             inputs, labels = data
             inputs, labels = inputs.to(device), labels.to(device)
             self.optimizer.zero_grad()
-            outputs = self.model(inputs)
-            loss = self.criterion(outputs, labels)
-            loss.backward()
-            self.optimizer.step()
+
+            if self.device != 'cpu':
+                with torch.autocast(device_type="cuda"):
+                    outputs = self.model(inputs)
+                    loss = self.criterion(outputs, labels)
+                    loss.backward()
+                    self.optimizer.step()
+            else:
+                with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+                    outputs = self.model(inputs)
+                    loss = self.criterion(outputs, labels)
+                    loss.backward()
+                    self.optimizer.step()
 
             running_loss += loss.item()
             _, predicted = torch.max(outputs.data, 1)
@@ -55,8 +64,16 @@ class BaseTrainer:
             for data in loader:
                 inputs, labels = data
                 inputs, labels = inputs.to(device), labels.to(device)
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, labels)
+
+                if self.device != 'cpu':
+                    with torch.autocast(device_type="cuda"):
+                        outputs = self.model(inputs)
+                        loss = self.criterion(outputs, labels)
+                else:
+                    with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+                        outputs = self.model(inputs)
+                        loss = self.criterion(outputs, labels)
+
                 loss += loss.item()
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
