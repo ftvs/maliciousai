@@ -14,6 +14,7 @@ class CelebDF2(VisionDataset):
             root: str,
             max_frames=int,
             n_frames = int,
+            type = str,
             transforms: Optional[Callable] = None,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
@@ -25,13 +26,18 @@ class CelebDF2(VisionDataset):
         set_name = 'Celeb-DF-v2'
         self._data_path = root + '/' + set_name # eg data/Celeb-DF-v2
 
+        
         # read path, verify, throw exception if nonexistent or other problem
         with open(self._data_path + '/List_of_testing_videos.txt',
-                  encoding='utf-8') as data:
-            reader = csv.reader(data, delimiter=' ')
+                encoding='utf-8') as data:
+            val_reader = csv.reader(data, delimiter=' ')
             # read into list of lists. 0: fake, 1: real. eg
             # [['1', 'YouTube-real/00170.mp4'], ...]
-            self._data_info = list(reader) # list[list[str, str]]
+            if type == 'val':
+                self._data_info = list(val_reader) # list[list[str, str]]
+        
+            else:
+                self._val_info = list(val_reader)
 
     def __len__(self) -> int:
         ''' return total number of clips '''

@@ -35,8 +35,8 @@ class BaseTrainer:
                 'epoch': epoch+1,
                 'model_state_dict': self.model.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
-                'loss': val_loss,
-                'acc': val_accuracy,
+                'loss': self.train_log,
+                'acc': self.val_log,
                 }, 's3d_rgb.pth')
         
         return self.train_log, self.val_log
