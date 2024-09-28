@@ -12,14 +12,16 @@ class CelebDF2(VisionDataset):
     def __init__(
             self,
             root: str,
-            n_frames=int,
+            max_frames=int,
+            n_frames = int,
             transforms: Optional[Callable] = None,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
     ) -> None:
         super().__init__(root, transforms, transform, target_transform)
 
-        self.n_frames = n_frames  # Fixed number of frames to clip from each video
+        self.max_frames = max_frames  # Fixed number of frames to clip from each video
+        self.n_frames = n_frames
         set_name = 'Celeb-DF-v2'
         self._data_path = root + '/' + set_name # eg data/Celeb-DF-v2
 
@@ -46,8 +48,11 @@ class CelebDF2(VisionDataset):
                                             output_format='TCHW', pts_unit='sec') # time, channels, height, width
         class_index = int(label) # get label index
 
-        # Clip frames to the fixed number `n_frames`
+        # Clip frames to the fixed number `max_frames`
         video = self._clip_frames(video) 
+
+        # sample n number of frames from clipped video
+        video = self._sample_frames(video)
 
         if self.transform is not None:
             video = self.transform(video)
@@ -58,15 +63,23 @@ class CelebDF2(VisionDataset):
         return video, class_index
     
     def _clip_frames(self, frames):
-        """Clip the video frames to a fixed number of frames `n_frames`."""
-        # If the video has more frames than n_frames, clip it to the first `n_frames`
-        if len(frames) > self.n_frames:
-            return frames[:self.n_frames]
+        """Clip the video frames to a fixed number of frames `max_frames`."""
+        # If the video has more frames than max_frames, clip it to the first `max_frames`
+        if len(frames) > self.max_frames:
+            return frames[:self.max_frames]
         
-        # If the video has fewer frames than `n_frames`, pad with zeros
-        pad_size = self.n_frames - len(frames)
+        # If the video has fewer frames than `max_frames`, pad with zeros
+        pad_size = self.max_frames - len(frames)
         pad_frames = torch.zeros((pad_size, *frames.shape[1:]))  # Create padding frames with same size
         frames = torch.cat([frames, pad_frames], dim=0)
+        
+        return frames
+    
+    def _sample_frames(self, frames):
+        """Sample n number of frames from cliped video"""
+        if len(frames) > self.n_frames:
+            indices = torch.linspace(0, len(frames)-1, steps=self.n_frames).long()
+            frames = frames[indices]  
         
         return frames
     

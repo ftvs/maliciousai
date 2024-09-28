@@ -9,10 +9,13 @@ class BaseTrainer:
         self.train_loader = train_loader  #the train loader
         self.val_loader = val_loader  #the valid loader
         self.device = device
+        self.train_log = []
+        self.val_log = []
 
     #the function to train the model in many epochs
     def fit(self, num_epochs):
         self.num_batches = len(self.train_loader)
+        best_acc = 0.0
 
         for epoch in range(num_epochs):
             start = time.time()
@@ -20,9 +23,21 @@ class BaseTrainer:
             train_loss, train_accuracy = self.train_one_epoch()
             val_loss, val_accuracy = self.validate_one_epoch()
             end = time.time()
-            print(
-                f'{self.num_batches}/{self.num_batches} - train_loss: {train_loss:.4f} - train_accuracy: {train_accuracy*100:.4f}%
-                - val_loss: {val_loss:.4f} - val_accuracy: {val_accuracy*100:.4f}% - Time Taken: {end-start}')
+            # log results
+            self.train_log.append((train_loss, train_accuracy))
+            self.val_log.append((val_loss, val_accuracy))
+            print(f"{self.num_batches}/{self.num_batches} - Time Taken: {end-start} - train_loss: {train_loss:.4f} - train_accuracy: {train_accuracy*100:.4f}% - val_loss: {val_loss:.4f} - val_accuracy: {val_accuracy*100:.4f}%")
+
+            # save model based on validation result
+            if val_accuracy > best_acc:
+                best_acc = val_accuracy
+                torch.save({
+                'epoch': epoch+1,
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                'loss': val_loss,
+                'acc': val_accuracy,
+                }, 's3d_rgb.pth')
 
     #train in one epoch, return the train_acc, train_loss
     def train_one_epoch(self):

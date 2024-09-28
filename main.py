@@ -121,10 +121,12 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     ])
     # transform = S3D_Weights.DEFAULT.transforms()
 
-    dataset = CelebDF2(dataset_path, transform=transform, n_frames=180) # 6s @ 30fps = 180 frames
+    dataset = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150) # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_data, val_data = random_split(dataset, [train_size, val_size])
+    print(f"Training size: {train_size}")
+    print(f"Validation size: {val_size}")
 
     train_loader = DataLoader(train_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True) #, num_workers=4, persistent_workers=True
     val_loader = DataLoader(val_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True) # , num_workers=4, persistent_workers=True # maybe just split from training
@@ -143,20 +145,5 @@ def train_s3d(dataset_path,batch_size,device,epochs):
         device = device)
 
     trainer.fit(epochs)
-    result = trainer.evaluate(val_loader)
-    print('test performance:', result)
-
-
-# Run selected model
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# dataset_path = "data"
-# batch_size = 1
-# epochs = 1
-# train_s3d(dataset_path,batch_size,device,epochs)
-
-# issues:
-# Resolved 1. model is not training
-# Resolved 2. when batch size more than 1 need to constict the number of frames
-#   - use a collate function to use the minimum/fixed number of frames in batch
-# Resolved 3. crop a small amount then resize
-# 4. train using adversial data like black box attacks (random noise)
+    # result = trainer.evaluate(val_loader)
+    # print('test performance:', result)
