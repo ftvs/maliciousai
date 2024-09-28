@@ -144,6 +144,8 @@ def train_s3d(dataset_path,batch_size,device,epochs):
         val_loader,
         device = device)
 
-    trainer.fit(epochs)
+    train_log, val_log = trainer.fit(epochs)
     # result = trainer.evaluate(val_loader)
     # print('test performance:', result)
+
+    return train_log, val_log

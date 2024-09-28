@@ -38,6 +38,8 @@ class BaseTrainer:
                 'loss': val_loss,
                 'acc': val_accuracy,
                 }, 's3d_rgb.pth')
+        
+        return self.train_log, self.val_log
 
     #train in one epoch, return the train_acc, train_loss
     def train_one_epoch(self):
