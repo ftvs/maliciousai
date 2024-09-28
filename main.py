@@ -123,11 +123,11 @@ def train_s3d(dataset_path,batch_size,device,epochs):
 
     dataset = CelebDF2(dataset_path, transform=transform, n_frames=180) # 6s @ 30fps = 180 frames
     train_size = int(0.8 * len(dataset))
-    test_size = len(dataset) - train_size
-    train_data, test_data = random_split(dataset, [train_size, test_size])
+    val_size = len(dataset) - train_size
+    train_data, val_data = random_split(dataset, [train_size, val_size])
 
     train_loader = DataLoader(train_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True) #, num_workers=4, persistent_workers=True
-    test_loader = DataLoader(test_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True) # , num_workers=4, persistent_workers=True # maybe just split from training
+    val_loader = DataLoader(val_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True) # , num_workers=4, persistent_workers=True # maybe just split from training
 
     first_data, first_labels = next(iter(train_loader))
     # print(first_data)
@@ -139,11 +139,11 @@ def train_s3d(dataset_path,batch_size,device,epochs):
         nn.CrossEntropyLoss(),
         torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9),
         train_loader,
-        test_loader,
+        val_loader,
         device = device)
 
     trainer.fit(epochs)
-    result = trainer.evaluate(test_loader)
+    result = trainer.evaluate(val_loader)
     print('test performance:', result)
 
 

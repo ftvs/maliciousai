@@ -15,19 +15,20 @@ class BaseTrainer:
         self.num_batches = len(self.train_loader)
 
         for epoch in range(num_epochs):
+            start = time.time()
             print(f'Epoch {epoch + 1}/{num_epochs}')
             train_loss, train_accuracy = self.train_one_epoch()
             val_loss, val_accuracy = self.validate_one_epoch()
+            end = time.time()
             print(
-                f'{self.num_batches}/{self.num_batches} - train_loss: {train_loss:.4f} - train_accuracy: {train_accuracy*100:.4f}% \
-                - val_loss: {val_loss:.4f} - val_accuracy: {val_accuracy*100:.4f}%')
+                f'{self.num_batches}/{self.num_batches} - train_loss: {train_loss:.4f} - train_accuracy: {train_accuracy*100:.4f}%
+                - val_loss: {val_loss:.4f} - val_accuracy: {val_accuracy*100:.4f}% - Time Taken: {end-start}')
 
     #train in one epoch, return the train_acc, train_loss
     def train_one_epoch(self):
         self.model.train()
         device = self.device
         running_loss, correct, total = 0.0, 0, 0
-        start = time.time()
 
         for i, data in enumerate(self.train_loader):
             # print(f"training: {i}")
@@ -64,8 +65,6 @@ class BaseTrainer:
         
         train_accuracy = correct / total
         train_loss = running_loss / self.num_batches
-        end = time.time()
-        print(f"Time Taken: {end-start}")
 
         return train_loss, train_accuracy
 
