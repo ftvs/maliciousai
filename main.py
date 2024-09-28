@@ -121,12 +121,15 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     ])
     # transform = S3D_Weights.DEFAULT.transforms()
 
-    dataset = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150) # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
-    train_size = int(0.8 * len(dataset))
-    val_size = len(dataset) - train_size
-    train_data, val_data = random_split(dataset, [train_size, val_size])
-    print(f"Training size: {train_size}")
-    print(f"Validation size: {val_size}")
+    train_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_training_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    val_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    
+    # dataset = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150,file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    # train_size = int(0.8 * len(dataset))
+    # val_size = len(dataset) - train_size
+    # train_data, val_data = random_split(dataset, [train_size, val_size])
+    print(f"Training size: {len(train_data)}")
+    print(f"Validation size: {len(val_data)}")
 
     train_loader = DataLoader(train_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True) #, num_workers=4, persistent_workers=True
     val_loader = DataLoader(val_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True) # , num_workers=4, persistent_workers=True # maybe just split from training
@@ -145,7 +148,8 @@ def train_s3d(dataset_path,batch_size,device,epochs):
         device = device)
 
     train_log, val_log = trainer.fit(epochs)
-    # result = trainer.evaluate(val_loader)
-    # print('test performance:', result)
+    result = trainer.evaluate(val_loader)
+    print('test performance:', result)
 
     return train_log, val_log
+    # return None,None
