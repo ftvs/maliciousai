@@ -143,13 +143,14 @@ def train_s3d(dataset_path,batch_size,device,epochs):
         model,
         nn.CrossEntropyLoss(),
         torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9),
+        # torch.optim.Adam(model.parameters(), lr=1e-3),
         train_loader,
         val_loader,
         device = device)
 
     train_log, val_log = trainer.fit(epochs)
-    result = trainer.evaluate(val_loader)
-    print('test performance:', result)
+    # result = trainer.evaluate(val_loader)
+    # print('test performance:', result)
 
     return train_log, val_log
     # return None,None

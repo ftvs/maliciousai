@@ -26,7 +26,7 @@ class BaseTrainer:
             # log results
             self.train_log.append((train_loss, train_accuracy))
             self.val_log.append((val_loss, val_accuracy))
-            print(f"{self.num_batches}/{self.num_batches} - Time Taken: {end-start} - train_loss: {train_loss:.4f} - train_accuracy: {train_accuracy*100:.4f}% - val_loss: {val_loss:.4f} - val_accuracy: {val_accuracy*100:.4f}%")
+            print(f"{self.num_batches}/{self.num_batches} - Time Taken: {(end-start)/60} - train_loss: {train_loss:.4f} - train_accuracy: {train_accuracy*100:.4f}% - val_loss: {val_loss:.4f} - val_accuracy: {val_accuracy*100:.4f}%")
 
             # save model based on validation result
             if val_accuracy > best_acc:
@@ -35,9 +35,19 @@ class BaseTrainer:
                 'epoch': epoch+1,
                 'model_state_dict': self.model.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
+                'train': (train_loss, train_accuracy),
+                'val': (val_loss, val_accuracy),
+                }, 's3d_rgb_best.pth') 
+
+            else:
+                torch.save({
+                'epoch': epoch+1,
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
                 'train': self.train_log,
                 'val': self.val_log,
-                }, 's3d_rgb.pth')
+                }, 's3d_rgb_last.pth') 
+
         
         return self.train_log, self.val_log
 
