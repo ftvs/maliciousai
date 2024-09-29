@@ -1,5 +1,6 @@
 import torch
 import time
+import torch.optim as optim
 
 class BaseTrainer:
     def __init__(self, model, criterion, optimizer, train_loader, val_loader, device='cpu'):
@@ -17,11 +18,15 @@ class BaseTrainer:
         self.num_batches = len(self.train_loader)
         best_acc = 0.0
 
+        # Learning rate scheduler: Divide by 10 every 5 epochs
+        # scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=5, gamma=0.1)
+
         for epoch in range(num_epochs):
             start = time.time()
             print(f'Epoch {epoch + 1}/{num_epochs}')
             train_loss, train_accuracy = self.train_one_epoch()
             val_loss, val_accuracy = self.validate_one_epoch()
+            # scheduler.step()
             end = time.time()
             # log results
             self.train_log.append((train_loss, train_accuracy))
@@ -39,14 +44,14 @@ class BaseTrainer:
                 'val': (val_loss, val_accuracy),
                 }, 's3d_rgb_best.pth') 
 
-            else:
-                torch.save({
-                'epoch': epoch+1,
-                'model_state_dict': self.model.state_dict(),
-                'optimizer_state_dict': self.optimizer.state_dict(),
-                'train': self.train_log,
-                'val': self.val_log,
-                }, 's3d_rgb_last.pth') 
+            # save latest model
+            torch.save({
+            'epoch': epoch+1,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'train': self.train_log,
+            'val': self.val_log,
+            }, 's3d_rgb_last.pth') 
 
         
         return self.train_log, self.val_log
