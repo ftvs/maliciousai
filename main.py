@@ -147,10 +147,10 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     print(f"Input Shape: {first_data.shape}")
     print(f"label Shape: {first_labels.shape}")
 
-    # scale weights based on class distribution [(890-178),(2539-340)]
-    # class_sample_counts = [712, 2199]  # Updated with your distribution
-    class_sample_counts = [178, 340]  # Updated with your distribution
-    class_weights = 518.0 / torch.tensor(class_sample_counts, dtype=torch.float)
+    # scale weights based on class distribution [(890-178),(5639-340)]
+    # class_sample_counts = [712, 5299]  # Updated with your distribution
+    class_sample_counts = np.array([178, 340])  # Updated with your distribution
+    class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts*2), dtype=torch.float)
 
     trainer = BaseTrainer(
         model,
