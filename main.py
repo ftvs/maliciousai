@@ -101,10 +101,17 @@ from celebdf2 import *
 def train_s3d(dataset_path,batch_size,device,epochs):
     #%%
     model = s3d(weights=S3D_Weights.DEFAULT)
-    # freeze(model)
-    unfreeze(model)
+    freeze(model)
+    # unfreeze(model)
     # replace final layer with new one with appropriate num of classes
     model.classifier[1] = nn.Conv3d(1024, 2, kernel_size=1, stride=1)
+
+    # check if weights are forzen
+    # for name, param in model.named_parameters():
+    #     if not param.requires_grad:
+    #         print(f"Parameter {name} is frozen.")
+    #     else:
+    #         print(f"Parameter {name} is trainable.")
 
     # class ConvertBCHWtoCBHW(nn.Module):
     #     """Convert tensor from (B, C, H, W) to (C, B, H, W)"""
@@ -141,16 +148,17 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     print(f"label Shape: {first_labels.shape}")
 
     # scale weights based on class distribution [(890-178),(2539-340)]
-    class_sample_counts = [178, 340]  # Updated with your distribution
     # class_sample_counts = [712, 2199]  # Updated with your distribution
-    class_weights = 1.0 / torch.tensor(class_sample_counts, dtype=torch.float)
+    class_sample_counts = [178, 340]  # Updated with your distribution
+    class_weights = 518.0 / torch.tensor(class_sample_counts, dtype=torch.float)
 
     trainer = BaseTrainer(
         model,
         nn.CrossEntropyLoss(weight=class_weights.to(device)),
-        # optim.SGD(model.parameters(), lr=0.002, momentum=0.9,weight_decay=0.0005), #lr=1e-3,weight_decay=0.0005
-        # optim.Adam(model.parameters(), lr=1e-3),
-        optim.AdamW(model.parameters(), lr=0.001), #default: betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01
+        # nn.CrossEntropyLoss(),
+        optim.SGD(model.parameters(), lr=0.001, momentum=0.9,weight_decay=0.0005), #lr=1e-3,weight_decay=0.0005
+        # optim.Adam(model.parameters(), lr=1e-3,weight_decay=0.0005),
+        # optim.AdamW(model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01), #default: betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01
         train_loader,
         val_loader,
         device = device)
