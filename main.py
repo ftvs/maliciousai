@@ -156,9 +156,16 @@ def train_s3d(dataset_path,batch_size,device,epochs):
         model,
         nn.CrossEntropyLoss(weight=class_weights.to(device)),
         # nn.CrossEntropyLoss(),
-        optim.SGD(model.parameters(), lr=0.001, momentum=0.9,weight_decay=0.0005), #lr=1e-3,weight_decay=0.0005
+
+        # SGD: overfit/train slow + good generalise well
+        # optim.SGD(model.parameters(), lr=0.001, momentum=0.9,weight_decay=0.0005), #lr=1e-3,weight_decay=0.0005
+
+        # Adam: overfits/train fast + generalise ok but may not be optimal
         # optim.Adam(model.parameters(), lr=1e-3,weight_decay=0.0005),
-        # optim.AdamW(model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01), #default: betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01
+
+        # AdamW: overfits/train very fast + generalise ok
+        optim.AdamW(model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.0005), #default: betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01
+        
         train_loader,
         val_loader,
         device = device)
