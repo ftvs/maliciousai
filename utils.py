@@ -12,8 +12,8 @@ class BaseTrainer:
         self.device = device
         self.train_log = []
         self.val_log = []
-        # batcg_loss = [[epoch1],[epoch2],[epoch3]]
-        # batcg_acc = [[epoch1],[epoch2],[epoch3]]
+        self.train_run = []
+        # self.val_run = []
 
     #the function to train the model in many epochs
     def fit(self, num_epochs):
@@ -33,7 +33,7 @@ class BaseTrainer:
             # log results
             self.train_log.append((train_loss, train_accuracy))
             self.val_log.append((val_loss, val_accuracy))
-            print(f"{self.num_batches}/{self.num_batches} - Time Taken: {(end-start)/60} - train_loss: {train_loss:.4f} - train_accuracy: {train_accuracy*100:.4f}% - val_loss: {val_loss:.4f} - val_accuracy: {val_accuracy*100:.4f}%")
+            print(f"{self.num_batches}/{self.num_batches} - Time Taken: {(end-start)/60:.2f} - train_loss: {train_loss:.4f} - train_accuracy: {train_accuracy*100:.4f}% - val_loss: {val_loss:.4f} - val_accuracy: {val_accuracy*100:.4f}%")
 
             # save model based on validation result
             if val_accuracy > best_acc:
@@ -53,6 +53,8 @@ class BaseTrainer:
             'optimizer_state_dict': self.optimizer.state_dict(),
             'train': self.train_log,
             'val': self.val_log,
+            'train_run':self.train_run
+            # 'val_run':self.val_run,
             }, 's3d_rgb_last.pth') 
 
         
@@ -63,6 +65,9 @@ class BaseTrainer:
         self.model.train()
         device = self.device
         running_loss, correct, total = 0.0, 0, 0
+        train_run = []
+        # val_run = []
+        start = time.time()
 
         for i, data in enumerate(self.train_loader):
             # print(f"training: {i}")
@@ -96,9 +101,25 @@ class BaseTrainer:
             # print("metrics")
             # end = time.time()
             # print(f"Time Taken: {end-start}")
-        
+
+            if (i+1) % 10 == 0:
+                acc = correct / total
+                los = running_loss / (i+1)
+                train_run.append((los,acc))
+
+                # v_loss, v_acc = self.validate_one_epoch()
+                # val_run.append((v_loss, v_acc))
+                # self.model.train()
+
+                end = time.time()
+                print(f"{i+1}/{self.num_batches} - Time Taken: {(end-start)/60:.2f} - train_loss: {los:.4f} - train_accuracy: {acc*100:.4f}%") # - val_loss: {v_loss:.4f} - val_accuracy: {v_acc*100:.4f}%
+                start = time.time()
+
         train_accuracy = correct / total
         train_loss = running_loss / self.num_batches
+
+        self.train_run.append(train_run)
+        # self.val_run.append(val_run)
 
         return train_loss, train_accuracy
 

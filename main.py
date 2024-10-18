@@ -164,7 +164,7 @@ def train_s3d(dataset_path,batch_size,device,epochs):
         # optim.Adam(model.parameters(), lr=1e-3,weight_decay=0.0005),
 
         # AdamW: overfits/train very fast + generalise ok
-        optim.AdamW(model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.0005), #default: betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01
+        optim.AdamW(model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01), #default: betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01/0.0005
         
         train_loader,
         val_loader,
