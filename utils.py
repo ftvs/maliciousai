@@ -12,6 +12,8 @@ class BaseTrainer:
         self.device = device
         self.train_log = []
         self.val_log = []
+        # batcg_loss = [[epoch1],[epoch2],[epoch3]]
+        # batcg_acc = [[epoch1],[epoch2],[epoch3]]
 
     #the function to train the model in many epochs
     def fit(self, num_epochs):
