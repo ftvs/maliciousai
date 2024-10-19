@@ -1,6 +1,7 @@
 import torch
 import time
 import torch.optim as optim
+from sklearn.metrics import confusion_matrix
 
 class BaseTrainer:
     def __init__(self, model, criterion, optimizer, train_loader, val_loader, device='cpu'):
@@ -27,7 +28,7 @@ class BaseTrainer:
             start = time.time()
             print(f'Epoch {epoch + 1}/{num_epochs}')
             train_loss, train_accuracy = self.train_one_epoch()
-            val_loss, val_accuracy = self.validate_one_epoch()
+            val_loss, val_accuracy, cm = self.validate_one_epoch()
             # scheduler.step()
             end = time.time()
             # log results
@@ -36,7 +37,7 @@ class BaseTrainer:
             print(f"{self.num_batches}/{self.num_batches} - Time Taken: {(end-start)/60:.2f} - train_loss: {train_loss:.4f} - train_accuracy: {train_accuracy*100:.4f}% - val_loss: {val_loss:.4f} - val_accuracy: {val_accuracy*100:.4f}%")
 
             # save model based on validation result
-            if val_accuracy > best_acc:
+            if val_accuracy >= best_acc:
                 best_acc = val_accuracy
                 torch.save({
                 'epoch': epoch+1,
@@ -44,6 +45,7 @@ class BaseTrainer:
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'train': (train_loss, train_accuracy),
                 'val': (val_loss, val_accuracy),
+                'confusion_matrix': cm,
                 }, 's3d_rgb_best.pth') 
 
             # save latest model
@@ -53,11 +55,11 @@ class BaseTrainer:
             'optimizer_state_dict': self.optimizer.state_dict(),
             'train': self.train_log,
             'val': self.val_log,
-            'train_run':self.train_run
+            'train_run':self.train_run,
             # 'val_run':self.val_run,
+            'confusion_matrix': cm,
             }, 's3d_rgb_last.pth') 
 
-        
         return self.train_log, self.val_log
 
     #train in one epoch, return the train_acc, train_loss
@@ -129,6 +131,8 @@ class BaseTrainer:
         self.model.eval()
         device = self.device
         loss, total_loss, correct, total = 0.0, 0.0, 0, 0
+        all_preds = []
+        all_labels = []
 
         with torch.no_grad():
             for data in loader:
@@ -149,15 +153,28 @@ class BaseTrainer:
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
+                # Collect predictions and labels for confusion matrix
+                all_preds.extend(predicted.cpu().numpy())
+                all_labels.extend(labels.cpu().numpy())
+        
+
         accuracy = correct / total
         loss = total_loss / len(loader)
-        print(total_loss,len(loader))
-        return loss, accuracy
+        # print(total_loss,len(loader))
+
+        # Generate the confusion matrix
+        cm = confusion_matrix(all_labels, all_preds)
+
+        return loss, accuracy, cm
 
     #return the val_acc, val_loss, be called at the end of each epoch
     def validate_one_epoch(self):
-        val_loss, val_accuracy = self.evaluate(self.val_loader)
-        return val_loss, val_accuracy
+        val_loss, val_accuracy, val_cm = self.evaluate(self.val_loader)
+        return val_loss, val_accuracy, val_cm
+    
+    def validate_train_loader(self):
+        train_loss, train_accuracy, train_cm = self.evaluate(self.train_loader)
+        return train_loss, train_accuracy, train_cm
     
 def freeze(model: torch.nn.Module):
     ''' Disable model training '''
