@@ -3,7 +3,10 @@ import time
 import torch.optim as optim
 
 class BaseTrainer:
-    def __init__(self, model, criterion, optimizer, train_loader, val_loader, device='cpu'):
+    def __init__(self, model, criterion, optimizer, train_loader, val_loader,
+                 device='cpu', validation_interval=0):
+        ''' validation_interval is the number of batches to train on before
+        validating and logging loss/acc to allow data points within each epoch '''
         self.model = model.to(device)
         self.criterion = criterion  #the loss function
         self.optimizer = optimizer  #the optimizer
@@ -14,6 +17,9 @@ class BaseTrainer:
         self.val_log = []
         self.train_run = []
         # self.val_run = []
+
+        self.validation_interval = validation_interval
+        self.batches_val_log = []
 
     #the function to train the model in many epochs
     def fit(self, num_epochs):
@@ -53,11 +59,11 @@ class BaseTrainer:
             'optimizer_state_dict': self.optimizer.state_dict(),
             'train': self.train_log,
             'val': self.val_log,
-            'train_run':self.train_run
+            'train_run':self.train_run,
+            'batches_intervals_log': self.batches_val_log,
             # 'val_run':self.val_run,
             }, 's3d_rgb_last.pth') 
 
-        
         return self.train_log, self.val_log
 
     #train in one epoch, return the train_acc, train_loss
@@ -76,6 +82,7 @@ class BaseTrainer:
             inputs, labels = data
             inputs, labels = inputs.to(device), labels.to(device)
             self.optimizer.zero_grad()
+            interval_log = []
 
             if self.device != 'cpu':
                 with torch.autocast(device_type="cuda"):
@@ -116,9 +123,16 @@ class BaseTrainer:
                 start = time.time()
                 # break
 
+            # every validation_interval batches, log loss, acc
+            if (self.validation_interval > 0 and i > 0
+                    and i % self.validation_interval == 0):
+                loss, acc = self.evaluate(self.val_loader)
+                interval_log.append((loss, acc))
+
         train_accuracy = correct / total
         train_loss = running_loss / self.num_batches
 
+        self.batches_val_log.append(interval_log)
         self.train_run.append(train_run)
         # self.val_run.append(val_run)
 
