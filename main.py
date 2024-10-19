@@ -101,8 +101,8 @@ from celebdf2 import *
 def train_s3d(dataset_path,batch_size,device,epochs):
     #%%
     model = s3d(weights=S3D_Weights.DEFAULT)
-    freeze(model)
-    # unfreeze(model)
+    # freeze(model)
+    unfreeze(model)
     # replace final layer with new one with appropriate num of classes
     model.classifier[1] = nn.Conv3d(1024, 2, kernel_size=1, stride=1)
 
@@ -129,18 +129,18 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     ])
     # transform = S3D_Weights.DEFAULT.transforms()
 
-    # train_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_training_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
-    # val_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    train_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_training_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    val_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
     
-    dataset = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150,file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
-    train_size = int(0.8 * len(dataset))
-    val_size = len(dataset) - train_size
-    train_data, val_data = random_split(dataset, [train_size, val_size])
+    # dataset = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150,file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    # train_size = int(0.8 * len(dataset))
+    # val_size = len(dataset) - train_size
+    # train_data, val_data = random_split(dataset, [train_size, val_size])
     print(f"Training size: {len(train_data)}")
     print(f"Validation size: {len(val_data)}")
 
-    train_loader = DataLoader(train_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True) #, num_workers=4, persistent_workers=True
-    val_loader = DataLoader(val_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True) # , num_workers=4, persistent_workers=True # maybe just split from training
+    train_loader = DataLoader(train_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True, shuffle=True) #, num_workers=4, persistent_workers=True
+    val_loader = DataLoader(val_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True, shuffle=False) # , num_workers=4, persistent_workers=True # maybe just split from training
 
     first_data, first_labels = next(iter(train_loader))
     # print(first_data)
@@ -148,8 +148,8 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     print(f"label Shape: {first_labels.shape}")
 
     # scale weights based on class distribution [(890-178),(5639-340)]
-    # class_sample_counts = [712, 5299]  # Updated with your distribution
-    class_sample_counts = np.array([178, 340])  # Updated with your distribution
+    class_sample_counts = np.array([712, 5299])  # Updated with your distribution
+    # class_sample_counts = np.array([178, 340])  # Updated with your distribution
     class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts*2), dtype=torch.float)
 
     trainer = BaseTrainer(

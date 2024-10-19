@@ -102,7 +102,7 @@ class BaseTrainer:
             # end = time.time()
             # print(f"Time Taken: {end-start}")
 
-            if (i+1) % 10 == 0:
+            if (i+1) % 200 == 0:
                 acc = correct / total
                 los = running_loss / (i+1)
                 train_run.append((los,acc))
@@ -114,6 +114,7 @@ class BaseTrainer:
                 end = time.time()
                 print(f"{i+1}/{self.num_batches} - Time Taken: {(end-start)/60:.2f} - train_loss: {los:.4f} - train_accuracy: {acc*100:.4f}%") # - val_loss: {v_loss:.4f} - val_accuracy: {v_acc*100:.4f}%
                 start = time.time()
+                # break
 
         train_accuracy = correct / total
         train_loss = running_loss / self.num_batches
@@ -150,6 +151,7 @@ class BaseTrainer:
 
         accuracy = correct / total
         loss = total_loss / len(loader)
+        print(total_loss,len(loader))
         return loss, accuracy
 
     #return the val_acc, val_loss, be called at the end of each epoch
