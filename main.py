@@ -99,7 +99,6 @@ from celebdf2 import *
 #     trainer.fit(num_epochs=1)
 
 def train_s3d(dataset_path,batch_size,device,epochs):
-    #%%
     model = s3d(weights=S3D_Weights.DEFAULT)
     # freeze(model)
     unfreeze(model)
@@ -148,9 +147,15 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     print(f"label Shape: {first_labels.shape}")
 
     # scale weights based on class distribution [(890-178),(5639-340)]
-    class_sample_counts = np.array([712, 5299])  # Updated with your distribution
+    # class_sample_counts = np.array([712, 5299])  # Updated with your distribution
     # class_sample_counts = np.array([178, 340])  # Updated with your distribution
+
+    # scale weights based on class distribution [(5639-340),(890-178)]
+    class_sample_counts = np.array([5299, 712])  # Updated with your distribution
+    # class_sample_counts = np.array([340, 178])  # Updated with your distribution
     class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts*2), dtype=torch.float)
+    
+    # class_weights = 1 / torch.tensor((class_sample_counts), dtype=torch.float)
 
     trainer = BaseTrainer(
         model,
@@ -161,7 +166,7 @@ def train_s3d(dataset_path,batch_size,device,epochs):
         # optim.SGD(model.parameters(), lr=0.001, momentum=0.9,weight_decay=0.0005), #lr=1e-3,weight_decay=0.0005
 
         # Adam: overfits/train fast + generalise ok but may not be optimal
-        # optim.Adam(model.parameters(), lr=1e-3,weight_decay=0.0005),
+        # optim.Adam(model.parameters(), lr=1e-3), #,weight_decay=0.0005
 
         # AdamW: overfits/train very fast + generalise ok
         optim.AdamW(model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01), #default: betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01/0.0005
@@ -175,4 +180,77 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     # print('test performance:', result)
 
     return train_log, val_log
+    # return None,None
+
+def eval_s3d(dataset_path,batch_size,device,model_path):
+
+    transform = transforms.Compose([
+        transforms.ConvertImageDtype(torch.float32),    
+        transforms.Normalize(mean=(0.43216, 0.394666, 0.37645),
+                            std=(0.22803, 0.22145, 0.216989)),
+        # transforms.CenterCrop(256),
+        transforms.Resize((256,256))
+        # ConvertBCHWtoCBHW()
+    ])
+    # transform = S3D_Weights.DEFAULT.transforms()
+
+    train_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_training_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    val_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    
+    # dataset = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150,file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    # train_size = int(0.8 * len(dataset))
+    # val_size = len(dataset) - train_size
+    # train_data, val_data = random_split(dataset, [train_size, val_size])
+    print(f"Training size: {len(train_data)}")
+    print(f"Validation size: {len(val_data)}")
+
+    train_loader = DataLoader(train_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True, shuffle=False) #, num_workers=4, persistent_workers=True
+    val_loader = DataLoader(val_data, batch_size, pin_memory=True, num_workers=4, persistent_workers=True, shuffle=False) # , num_workers=4, persistent_workers=True # maybe just split from training
+
+    first_data, first_labels = next(iter(train_loader))
+    # print(first_data)
+    print(f"Input Shape: {first_data.shape}")
+    print(f"label Shape: {first_labels.shape}")
+
+    # scale weights based on class distribution [(890-178),(5639-340)]
+    class_sample_counts = np.array([712, 5299])  # Updated with your distribution
+    # class_sample_counts = np.array([178, 340])  # Updated with your distribution
+    class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts*2), dtype=torch.float)
+    # class_weights = 1 / torch.tensor((class_sample_counts), dtype=torch.float)
+
+    # load saved model
+    checkpoint = torch.load(model_path, weights_only=True)
+
+    # replace final layer with new one with appropriate num of classes
+    model = s3d(weights=S3D_Weights.DEFAULT)
+    model.classifier[1] = nn.Conv3d(1024, 2, kernel_size=1, stride=1)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    freeze(model)
+
+    optimizer = optim.AdamW(model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01)
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+    evaluater = BaseTrainer(
+        model,
+        nn.CrossEntropyLoss(weight=class_weights.to(device)),
+        # nn.CrossEntropyLoss(),
+
+        # SGD: overfit/train slow + good generalise well
+        # optim.SGD(model.parameters(), lr=0.001, momentum=0.9,weight_decay=0.0005), #lr=1e-3,weight_decay=0.0005
+
+        # Adam: overfits/train fast + generalise ok but may not be optimal
+        # optim.Adam(model.parameters(), lr=1e-3), #,weight_decay=0.0005
+
+        # AdamW: overfits/train very fast + generalise ok
+        optimizer, #default: betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01/0.0005
+    
+        train_loader,
+        val_loader,
+        device = device)
+
+    val_loss, val_accuracy, cm = evaluater.validate_one_epoch()
+    # result = trainer.evaluate(val_loader)
+    # print('test performance:', result)
+
+    return val_loss, val_accuracy, cm
     # return None,None
