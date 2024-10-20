@@ -82,6 +82,10 @@ class BaseTrainer:
             if self.device != 'cpu':
                 with torch.autocast(device_type="cuda"):
                     outputs = self.model(inputs)
+                    # print(outputs.shape)
+                    # print(outputs)
+                    # print(torch.softmax(outputs, dim=1))
+                    # print()
                     # print(f"output")
                     loss = self.criterion(outputs, labels)
                     # print(f"loss")
@@ -104,7 +108,7 @@ class BaseTrainer:
             # end = time.time()
             # print(f"Time Taken: {end-start}")
 
-            if (i+1) % 200 == 0:
+            if (i+1) % 300 == 0:
                 acc = correct / total
                 los = running_loss / (i+1)
                 train_run.append((los,acc))
@@ -173,6 +177,7 @@ class BaseTrainer:
         return val_loss, val_accuracy, val_cm
     
     def validate_train_loader(self):
+        print('Evaluating Train_loader....')
         train_loss, train_accuracy, train_cm = self.evaluate(self.train_loader)
         return train_loss, train_accuracy, train_cm
     

@@ -11,6 +11,7 @@ from torchvision.datasets.utils import download_url
 import torchvision.transforms.v2 as transforms
 
 import numpy as np
+import random
 
 # custom libraries
 from utils import *
@@ -99,6 +100,21 @@ from celebdf2 import *
 #     trainer.fit(num_epochs=1)
 
 def train_s3d(dataset_path,batch_size,device,epochs):
+    # Set the random seed for reproducibility
+    seed = 50  # You can choose any integer for your seed value
+
+    # Set the seed for PyTorch (CPU and CUDA)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)  # For multi-GPU setup
+
+    # Set the seed for Python's random module
+    random.seed(seed)
+
+    # Set the seed for NumPy
+    np.random.seed(seed)
+
     model = s3d(weights=S3D_Weights.DEFAULT)
     # freeze(model)
     unfreeze(model)
@@ -128,13 +144,13 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     ])
     # transform = S3D_Weights.DEFAULT.transforms()
 
-    train_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_training_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
-    val_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    # train_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_training_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    # val_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
     
-    # dataset = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150,file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
-    # train_size = int(0.8 * len(dataset))
-    # val_size = len(dataset) - train_size
-    # train_data, val_data = random_split(dataset, [train_size, val_size])
+    dataset = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150,file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    train_size = int(0.9 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_data, val_data = random_split(dataset, [train_size, val_size])
     print(f"Training size: {len(train_data)}")
     print(f"Validation size: {len(val_data)}")
 
@@ -151,8 +167,9 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     # class_sample_counts = np.array([178, 340])  # Updated with your distribution
 
     # scale weights based on class distribution [(5639-340),(890-178)]
-    class_sample_counts = np.array([5299, 712])  # Updated with your distribution
-    # class_sample_counts = np.array([340, 178])  # Updated with your distribution
+    # class_sample_counts = np.array([5299, 712])  # Updated with your distribution
+    class_sample_counts = np.array([340, 178])  # Updated with your distribution
+    # class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts), dtype=torch.float)
     class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts*2), dtype=torch.float)
     
     # class_weights = 1 / torch.tensor((class_sample_counts), dtype=torch.float)
@@ -163,13 +180,13 @@ def train_s3d(dataset_path,batch_size,device,epochs):
         # nn.CrossEntropyLoss(),
 
         # SGD: overfit/train slow + good generalise well
-        # optim.SGD(model.parameters(), lr=0.001, momentum=0.9,weight_decay=0.0005), #lr=1e-3,weight_decay=0.0005
+        optim.SGD(model.parameters(), lr=0.001, momentum=0.9,weight_decay=0.0005), #lr=1e-3,weight_decay=0.0005
 
         # Adam: overfits/train fast + generalise ok but may not be optimal
         # optim.Adam(model.parameters(), lr=1e-3), #,weight_decay=0.0005
 
         # AdamW: overfits/train very fast + generalise ok
-        optim.AdamW(model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01), #default: betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01/0.0005
+        # optim.AdamW(model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01), #default: betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01/0.0005
         
         train_loader,
         val_loader,
@@ -183,6 +200,20 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     # return None,None
 
 def eval_s3d(dataset_path,batch_size,device,model_path):
+    # Set the random seed for reproducibility
+    seed = 50  # You can choose any integer for your seed value
+
+    # Set the seed for PyTorch (CPU and CUDA)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)  # For multi-GPU setup
+
+    # Set the seed for Python's random module
+    random.seed(seed)
+
+    # Set the seed for NumPy
+    np.random.seed(seed)
 
     transform = transforms.Compose([
         transforms.ConvertImageDtype(torch.float32),    
@@ -194,13 +225,13 @@ def eval_s3d(dataset_path,batch_size,device,model_path):
     ])
     # transform = S3D_Weights.DEFAULT.transforms()
 
-    train_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_training_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
-    val_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    # train_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_training_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    # val_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
     
-    # dataset = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150,file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
-    # train_size = int(0.8 * len(dataset))
-    # val_size = len(dataset) - train_size
-    # train_data, val_data = random_split(dataset, [train_size, val_size])
+    dataset = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150,file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
+    train_size = int(0.9 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_data, val_data = random_split(dataset, [train_size, val_size])
     print(f"Training size: {len(train_data)}")
     print(f"Validation size: {len(val_data)}")
 
@@ -212,14 +243,14 @@ def eval_s3d(dataset_path,batch_size,device,model_path):
     print(f"Input Shape: {first_data.shape}")
     print(f"label Shape: {first_labels.shape}")
 
-    # scale weights based on class distribution [(890-178),(5639-340)]
-    class_sample_counts = np.array([712, 5299])  # Updated with your distribution
-    # class_sample_counts = np.array([178, 340])  # Updated with your distribution
+    # scale weights based on class distribution [(5639-340),(890-178)]
+    class_sample_counts = np.array([5299, 712])  # Updated with your distribution
+    # class_sample_counts = np.array([340, 178])  # Updated with your distribution
     class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts*2), dtype=torch.float)
     # class_weights = 1 / torch.tensor((class_sample_counts), dtype=torch.float)
 
     # load saved model
-    checkpoint = torch.load(model_path, weights_only=True)
+    checkpoint = torch.load(model_path, weights_only=False)
 
     # replace final layer with new one with appropriate num of classes
     model = s3d(weights=S3D_Weights.DEFAULT)
@@ -248,9 +279,10 @@ def eval_s3d(dataset_path,batch_size,device,model_path):
         val_loader,
         device = device)
 
-    val_loss, val_accuracy, cm = evaluater.validate_one_epoch()
+    # val_loss, val_accuracy, cm = evaluater.validate_one_epoch()
+    train_loss, train_accuracy, cm = evaluater.validate_train_loader()
     # result = trainer.evaluate(val_loader)
     # print('test performance:', result)
 
-    return val_loss, val_accuracy, cm
-    # return None,None
+    # return val_loss, val_accuracy, cm
+    return train_loss, train_accuracy, cm
