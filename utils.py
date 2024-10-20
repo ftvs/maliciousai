@@ -1,6 +1,7 @@
 import torch
 import time
 import torch.optim as optim
+import functools
 
 class BaseTrainer:
     def __init__(self, model, criterion, optimizer, train_loader, val_loader,
@@ -185,3 +186,25 @@ def _set_freeze(model: torch.nn.Module, freeze: bool):
     ''' Private helper function. Sets model freeze state. '''
     for param in model.parameters():
         param.requires_grad = not freeze
+
+def ensemble(models, loader):
+    ''' return tuple with two items. raw outputs of models, and averaged
+    combined outputs, for ensemble inferencing. '''
+    results = []
+
+    for data in loader:
+        inputs, labels = data
+        batch_results = [] # list of output tensors of models
+
+        for model in models:
+            # inference, then add the model's outputs to results
+            batch_results.append(model(inputs))
+
+        results.append(batch_results)
+
+    average_results = [
+        (functools.reduce(lambda curr, next: curr + next, outputs)
+            / float(len(outputs)))
+        for outputs in batch_results]
+
+    return results, average_results
