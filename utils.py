@@ -244,3 +244,57 @@ def ensemble(models, loader):
         for outputs in batch_results]
 
     return results, average_results
+
+# rgb_input -> model 1 -> [f,r]
+# flow_input -> model 2 -> [f,r]
+
+# (batch,class,prob)
+# batch = 1
+# output_1 = [0.4,0.6]
+# output_2 = [0.2,0.8]
+
+# avg = (output_1 + output_2) /2
+# final_prediction = max(avg)
+# final_prediction = [0.3,0.7]
+
+def ensemble(model_1, model_2, loader_1, loader_2, device):
+    ''' return tuple with two items. raw outputs of models, and averaged
+    combined outputs, for ensemble inferencing. '''
+    results = []
+
+    # RGB model
+    model_1.eval()
+    loss, total_loss, correct, total = 0.0, 0.0, 0, 0
+    all_preds = []
+    all_labels = []
+    
+    with torch.no_grad():
+        for i, data in enumerate(loader_1):
+            inputs, labels = data
+            inputs, labels = inputs.to(device), labels.to(device)
+            if device != 'cpu':
+                with torch.autocast(device_type="cuda"):
+                    outputs = self.model(inputs)
+                    loss = self.criterion(outputs, labels)
+            else:
+                with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+                    outputs = self.model(inputs)
+                    loss = self.criterion(outputs, labels)
+
+            
+            total_loss += loss.item()
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+            # Collect predictions and labels for confusion matrix
+            all_preds.extend(predicted.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+    
+    accuracy = correct / total
+    loss = total_loss / len(loader)
+    # print(total_loss,len(loader))
+    # Generate the confusion matrix
+    cm = confusion_matrix(all_labels, all_preds)
+
+
+    return 

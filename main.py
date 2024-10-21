@@ -81,7 +81,7 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     class_sample_counts = np.array([340, 178])  # Updated with your distribution
     class_weights = 1 / torch.tensor((class_sample_counts), dtype=torch.float)
     # class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts), dtype=torch.float)
-    # class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts*2), dtype=torch.float)
+    class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts*2), dtype=torch.float)
     # class_weights[1] = class_weights[1]*2
     
     
