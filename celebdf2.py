@@ -22,8 +22,8 @@ class CelebDF2(VisionDataset):
 
         self.max_frames = max_frames  # Fixed number of frames to clip from each video
         self.n_frames = n_frames
-        set_name = 'Celeb-DF-v2'
-        self._data_path = root + '/' + set_name # eg data/Celeb-DF-v2
+        #set_name = 'Celeb-DF-v2'
+        self._data_path = root #+ '/' + set_name # eg data/Celeb-DF-v2
 
         # read path, verify, throw exception if nonexistent or other problem
         with open(self._data_path + '/' + file_list,

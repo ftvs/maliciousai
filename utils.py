@@ -21,8 +21,7 @@ class BaseTrainer:
         # self.val_run = []
 
         self.validation_interval = validation_interval
-        self.batches_val_log = []
-
+        
     #the function to train the model in many epochs
     def fit(self, num_epochs):
         self.num_batches = len(self.train_loader)
@@ -34,8 +33,8 @@ class BaseTrainer:
         for epoch in range(num_epochs):
             start = time.time()
             print(f'Epoch {epoch + 1}/{num_epochs}')
-            train_loss, train_accuracy = self.train_one_epoch()
-            val_loss, val_accuracy, cm = self.validate_one_epoch()
+            train_loss, train_accuracy, train_cm = self.train_one_epoch()
+            val_loss, val_accuracy, val_cm = self.validate_one_epoch()
             # scheduler.step()
             end = time.time()
             # log results
@@ -52,7 +51,9 @@ class BaseTrainer:
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'train': (train_loss, train_accuracy),
                 'val': (val_loss, val_accuracy),
-                'confusion_matrix': cm,
+                'train_cm': train_cm,
+                'val_cm': val_cm,
+                'model':self.model,
                 }, 's3d_rgb_best.pth') 
 
             # save latest model
@@ -63,9 +64,10 @@ class BaseTrainer:
             'train': self.train_log,
             'val': self.val_log,
             'train_run':self.train_run,
-            'batches_intervals_log': self.batches_val_log,
             # 'val_run':self.val_run,
-            'confusion_matrix': cm,
+            'train_cm': train_cm,
+            'val_cm': val_cm,
+            'model':self.model,
             }, 's3d_rgb_last.pth') 
 
         return self.train_log, self.val_log
@@ -77,16 +79,17 @@ class BaseTrainer:
         running_loss, correct, total = 0.0, 0, 0
         train_run = []
         # val_run = []
+        all_preds = []
+        all_labels = []
+
         start = time.time()
 
         for i, data in enumerate(self.train_loader):
             # print(f"training: {i}")
             # start = time.time()
-
             inputs, labels = data
             inputs, labels = inputs.to(device), labels.to(device)
             self.optimizer.zero_grad()
-            interval_log = []
 
             if self.device != 'cpu':
                 with torch.autocast(device_type="cuda"):
@@ -95,13 +98,10 @@ class BaseTrainer:
                     # print(outputs)
                     # print(torch.softmax(outputs, dim=1))
                     # print()
-                    # print(f"output")
                     loss = self.criterion(outputs, labels)
-                    # print(f"loss")
                     loss.backward()
-                    # print(f"backward")
                     self.optimizer.step()
-                    # print("step")
+
             else:
                 with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
                     outputs = self.model(inputs)
@@ -113,11 +113,16 @@ class BaseTrainer:
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+
+            all_preds.extend(predicted.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            
             # print("metrics")
             # end = time.time()
             # print(f"Time Taken: {end-start}")
 
-            if (i+1) % 300 == 0:
+            # every validation_interval batches, log loss, acc
+            if (self.validation_interval > 0) and ((i+1) % self.validation_interval == 0):
                 acc = correct / total
                 los = running_loss / (i+1)
                 train_run.append((los,acc))
@@ -131,20 +136,15 @@ class BaseTrainer:
                 start = time.time()
                 # break
 
-            # every validation_interval batches, log loss, acc
-            if (self.validation_interval > 0 and i > 0
-                    and i % self.validation_interval == 0):
-                loss, acc = self.evaluate(self.val_loader)
-                interval_log.append((loss, acc))
-
         train_accuracy = correct / total
         train_loss = running_loss / self.num_batches
 
-        self.batches_val_log.append(interval_log)
         self.train_run.append(train_run)
         # self.val_run.append(val_run)
 
-        return train_loss, train_accuracy
+        cm = confusion_matrix(all_labels, all_preds)
+
+        return train_loss, train_accuracy, cm
 
     #evaluate on a loader and return the loss and accuracy
     def evaluate(self, loader):
@@ -155,7 +155,7 @@ class BaseTrainer:
         all_labels = []
 
         with torch.no_grad():
-            for data in loader:
+            for i, data in enumerate(loader):
                 inputs, labels = data
                 inputs, labels = inputs.to(device), labels.to(device)
 
@@ -176,6 +176,18 @@ class BaseTrainer:
                 # Collect predictions and labels for confusion matrix
                 all_preds.extend(predicted.cpu().numpy())
                 all_labels.extend(labels.cpu().numpy())
+                # print(all_preds)
+                # print(all_labels)
+
+                # every validation_interval batches, log loss, acc
+                # if (self.validation_interval > 0) and ((i+1) % self.validation_interval == 0):
+                #     acc = correct / total
+                #     los = total_loss / (i+1)
+
+                #     end = time.time()
+                #     print(f"{i+1}/{self.num_batches} - Time Taken: {(end-start)/60:.2f} - train_loss: {los:.4f} - train_accuracy: {acc*100:.4f}%") # - val_loss: {v_loss:.4f} - val_accuracy: {v_acc*100:.4f}%
+                #     start = time.time()
+                    # break
         
 
         accuracy = correct / total
@@ -221,7 +233,8 @@ def ensemble(models, loader):
 
         for model in models:
             # inference, then add the model's outputs to results
-            batch_results.append(model(inputs))
+            outputs = model(inputs)
+            batch_results.append(torch.softmax(outputs, dim=1))
 
         results.append(batch_results)
 

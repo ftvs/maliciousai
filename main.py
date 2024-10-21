@@ -12,92 +12,12 @@ import torchvision.transforms.v2 as transforms
 
 import numpy as np
 import random
+import copy
 
 # custom libraries
 from utils import *
 from celebdf2 import *
 
-# class MiniVGG(nn.Module):
-#     def __init__(self, n_classes=10):
-#         super(MiniVGG, self).__init__()
-
-#         self.features = nn.Sequential(
-#             nn.Conv2d(3, 32, kernel_size=3, padding=1),
-#             nn.BatchNorm2d(32, momentum=0.1),
-#             nn.ReLU(inplace=True), # How to customize activation function?
-
-#             nn.Conv2d(32, 32, kernel_size=3, padding=1),
-#             nn.BatchNorm2d(32, momentum=0.1),
-#             nn.ReLU(inplace=True),
-
-#             nn.MaxPool2d(kernel_size=2, stride=2),
-#             nn.Dropout(p=0.25),
-
-#             nn.Conv2d(32, 64, kernel_size=3, padding=1),
-#             nn.BatchNorm2d(64, momentum=0.1),
-#             nn.ReLU(inplace=True),
-
-#             nn.Conv2d(64, 64, kernel_size=3, padding=1),
-#             nn.BatchNorm2d(64, momentum=0.1),
-#             nn.ReLU(inplace=True),
-
-#             nn.MaxPool2d(kernel_size=2, stride=2),
-#             nn.Dropout(p=0.25),
-#         )
-
-#         self.classifier = nn.Sequential(
-#             nn.Flatten(),
-#             nn.Linear(64 * 8 * 8, 512),
-#             nn.BatchNorm1d(512, momentum=0.9),
-#             nn.ReLU(inplace=True),
-#             nn.Dropout(p=0.5),
-#             nn.Linear(512, n_classes)
-#         )
-
-#         # How to customize weight initialization?
-
-#     def forward(self, x):
-#         x = self.features(x)
-#         x = self.classifier(x)
-#         return x
-    
-
-# def train_vgg():
-#     # Define a transform to normalize the data
-#     transform = transforms.Compose(
-#         [transforms.ToTensor(),
-#         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-
-#     # Download and load the training set
-#     train_set = torchvision.datasets.CIFAR10(root='./data', train=True,
-#                                             download=True, transform=transform)
-#     train_loader = torch.utils.data.DataLoader(train_set, batch_size=64,
-#                                             shuffle=True)
-
-#     # Download and load the test set
-#     test_set = torchvision.datasets.CIFAR10(root='./data', train=False,
-#                                         download=True, transform=transform)
-#     test_loader = torch.utils.data.DataLoader(test_set, batch_size=64,
-#                                             shuffle=False)
-#     # Split the training set into two halves
-#     train_size = 5000
-#     val_size = 5000
-#     #split into three subsets train, valid, and the rest
-#     train_subset, val_subset, _ = torch.utils.data.random_split(train_set, [train_size, val_size, len(train_set) - train_size - val_size])
-
-#     # Create data loaders for the training and validation sets
-#     train_loader = torch.utils.data.DataLoader(train_subset, batch_size=64,
-#                                             shuffle=True)
-#     val_loader = torch.utils.data.DataLoader(val_subset, batch_size=64,
-#                                                 shuffle=False)
-
-#     model = MiniVGG()
-#     model = model.to(device)
-#     criterion = nn.CrossEntropyLoss()
-#     optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-#     trainer = BaseTrainer(model, criterion, optimizer, train_loader, val_loader)
-#     trainer.fit(num_epochs=1)
 
 def train_s3d(dataset_path,batch_size,device,epochs):
     # Set the random seed for reproducibility
@@ -115,6 +35,7 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     # Set the seed for NumPy
     np.random.seed(seed)
 
+    # Initialize the S3D model
     model = s3d(weights=S3D_Weights.DEFAULT)
     # freeze(model)
     unfreeze(model)
@@ -128,19 +49,12 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     #     else:
     #         print(f"Parameter {name} is trainable.")
 
-    # class ConvertBCHWtoCBHW(nn.Module):
-    #     """Convert tensor from (B, C, H, W) to (C, B, H, W)"""
-
-    #     def forward(self, vid: torch.Tensor) -> torch.Tensor:
-    #         return vid.permute(1, 0, 2, 3)
-
     transform = transforms.Compose([
         transforms.ConvertImageDtype(torch.float32),    
         transforms.Normalize(mean=(0.43216, 0.394666, 0.37645),
                             std=(0.22803, 0.22145, 0.216989)),
         # transforms.CenterCrop(256),
         transforms.Resize((256,256))
-        # ConvertBCHWtoCBHW()
     ])
     # transform = S3D_Weights.DEFAULT.transforms()
 
@@ -162,22 +76,18 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     print(f"Input Shape: {first_data.shape}")
     print(f"label Shape: {first_labels.shape}")
 
-    # scale weights based on class distribution [(890-178),(5639-340)]
-    # class_sample_counts = np.array([712, 5299])  # Updated with your distribution
-    # class_sample_counts = np.array([178, 340])  # Updated with your distribution
-
     # scale weights based on class distribution [(5639-340),(890-178)]
     # class_sample_counts = np.array([5299, 712])  # Updated with your distribution
     class_sample_counts = np.array([340, 178])  # Updated with your distribution
+    class_weights = 1 / torch.tensor((class_sample_counts), dtype=torch.float)
     # class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts), dtype=torch.float)
-    class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts*2), dtype=torch.float)
+    # class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts*2), dtype=torch.float)
+    # class_weights[1] = class_weights[1]*2
     
-    # class_weights = 1 / torch.tensor((class_sample_counts), dtype=torch.float)
-
+    
     trainer = BaseTrainer(
         model,
         nn.CrossEntropyLoss(weight=class_weights.to(device)),
-        # nn.CrossEntropyLoss(),
 
         # SGD: overfit/train slow + good generalise well
         optim.SGD(model.parameters(), lr=0.001, momentum=0.9,weight_decay=0.0005), #lr=1e-3,weight_decay=0.0005
@@ -190,7 +100,8 @@ def train_s3d(dataset_path,batch_size,device,epochs):
         
         train_loader,
         val_loader,
-        device = device)
+        device = device,
+        validation_interval=300)
 
     train_log, val_log = trainer.fit(epochs)
     # result = trainer.evaluate(val_loader)
@@ -221,7 +132,6 @@ def eval_s3d(dataset_path,batch_size,device,model_path):
                             std=(0.22803, 0.22145, 0.216989)),
         # transforms.CenterCrop(256),
         transforms.Resize((256,256))
-        # ConvertBCHWtoCBHW()
     ])
     # transform = S3D_Weights.DEFAULT.transforms()
 
@@ -244,45 +154,49 @@ def eval_s3d(dataset_path,batch_size,device,model_path):
     print(f"label Shape: {first_labels.shape}")
 
     # scale weights based on class distribution [(5639-340),(890-178)]
-    class_sample_counts = np.array([5299, 712])  # Updated with your distribution
-    # class_sample_counts = np.array([340, 178])  # Updated with your distribution
-    class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts*2), dtype=torch.float)
+    # class_sample_counts = np.array([5299, 712])  # Updated with your distribution
+    class_sample_counts = np.array([340, 178])  # Updated with your distribution
     # class_weights = 1 / torch.tensor((class_sample_counts), dtype=torch.float)
+    class_weights = sum(class_sample_counts) / torch.tensor((class_sample_counts*2), dtype=torch.float)
 
     # load saved model
     checkpoint = torch.load(model_path, weights_only=False)
 
-    # replace final layer with new one with appropriate num of classes
-    model = s3d(weights=S3D_Weights.DEFAULT)
-    model.classifier[1] = nn.Conv3d(1024, 2, kernel_size=1, stride=1)
-    model.load_state_dict(checkpoint['model_state_dict'])
+    # Initialize the S3D model & replace final layer with new one with appropriate num of classes
+    # model = s3d(weights=S3D_Weights.DEFAULT)
+    # model.classifier[1] = nn.Conv3d(1024, 2, kernel_size=1, stride=1)
+
+    # saved_weights = copy.deepcopy(model.state_dict())
+    # saved_weights = copy.deepcopy(checkpoint['model_state_dict'])
+
+    # model.load_state_dict(checkpoint['model_state_dict'])
+    model = checkpoint['model']
     freeze(model)
 
-    optimizer = optim.AdamW(model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01)
+    # Compare the keys and values
+    # for key in saved_weights:
+    #     if torch.equal(saved_weights[key], model.state_dict()[key]):
+    #         print(f"Weights for layer {key} match.")
+        
+    #     else:
+    #         print(f"Weights for layer {key} do not match.")
+            
+
+    # optimizer = optim.AdamW(model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01)
+    # optimizer = optim.Adam(model.parameters(), lr=1e-3), #,weight_decay=0.0005
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9,weight_decay=0.0005) #lr=1e-3,weight_decay=0.0005
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     evaluater = BaseTrainer(
         model,
         nn.CrossEntropyLoss(weight=class_weights.to(device)),
-        # nn.CrossEntropyLoss(),
-
-        # SGD: overfit/train slow + good generalise well
-        # optim.SGD(model.parameters(), lr=0.001, momentum=0.9,weight_decay=0.0005), #lr=1e-3,weight_decay=0.0005
-
-        # Adam: overfits/train fast + generalise ok but may not be optimal
-        # optim.Adam(model.parameters(), lr=1e-3), #,weight_decay=0.0005
-
-        # AdamW: overfits/train very fast + generalise ok
-        optimizer, #default: betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01/0.0005
-    
+        optimizer, 
         train_loader,
         val_loader,
-        device = device)
+        device = device,
+        validation_interval=100)
+    
+    train_loss, train_accuracy, train_cm = evaluater.validate_train_loader()
+    val_loss, val_accuracy, val_cm = evaluater.validate_one_epoch()
 
-    # val_loss, val_accuracy, cm = evaluater.validate_one_epoch()
-    train_loss, train_accuracy, cm = evaluater.validate_train_loader()
-    # result = trainer.evaluate(val_loader)
-    # print('test performance:', result)
-
-    # return val_loss, val_accuracy, cm
-    return train_loss, train_accuracy, cm
+    return train_loss, train_accuracy, train_cm ,val_loss, val_accuracy, val_cm
