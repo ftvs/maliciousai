@@ -222,28 +222,56 @@ def _set_freeze(model: torch.nn.Module, freeze: bool):
     for param in model.parameters():
         param.requires_grad = not freeze
 
-def ensemble(models, loader):
+def infer(model, loader, device: str):
+    ''' Get outputs, loss, accuracy, confusion matrix of inference '''
+    model.eval()
+    device = device
+    loss, total_loss, correct, total = 0.0, 0.0, 0, 0
+    all_preds = []
+    all_labels = []
+    all_outputs = []
+
+    with torch.no_grad():
+        for i, data in enumerate(loader):
+            inputs, labels = data
+            inputs, labels = inputs.to(device), labels.to(device)
+
+            if device != 'cpu':
+                with torch.autocast(device_type="cuda"):
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels)
+            else:
+                with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels)
+
+            all_outputs.append(outputs)
+            total_loss += loss.item()
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+            # Collect predictions and labels for confusion matrix
+            all_preds.extend(predicted.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+    
+    accuracy = correct / total
+    loss = total_loss / len(loader)
+
+    # Generate the confusion matrix
+    cm = confusion_matrix(all_labels, all_preds)
+
+    return outputs, loss, accuracy, cm
+    
+def ensemble(model1, model2, loader1, loader2, device: str):
     ''' return tuple with two items. raw outputs of models, and averaged
     combined outputs, for ensemble inferencing. '''
     results = []
 
-    for data in loader:
-        inputs, labels = data
-        batch_results = [] # list of output tensors of models
+    outputs1, loss1, acc1, conf_matrix1 = infer(model1, loader1, device)
+    outputs2, loss2, acc2, conf_matrix2 = infer(model2, loader2, device)
 
-        for model in models:
-            # inference, then add the model's outputs to results
-            outputs = model(inputs)
-            batch_results.append(torch.softmax(outputs, dim=1))
-
-        results.append(batch_results)
-
-    average_results = [
-        (functools.reduce(lambda curr, next: curr + next, outputs)
-            / float(len(outputs)))
-        for outputs in batch_results]
-
-    return results, average_results
+    # TODO avg out outputs 1 and 2, calc loss/acc. probably use outputs.data
 
 # rgb_input -> model 1 -> [f,r]
 # flow_input -> model 2 -> [f,r]
@@ -295,6 +323,5 @@ def ensemble(model_1, model_2, loader_1, loader_2, device):
     # print(total_loss,len(loader))
     # Generate the confusion matrix
     cm = confusion_matrix(all_labels, all_preds)
-
 
     return 
