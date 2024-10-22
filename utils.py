@@ -26,6 +26,7 @@ class BaseTrainer:
     def fit(self, num_epochs):
         self.num_batches = len(self.train_loader)
         best_acc = 0.0
+        best_train_acc = 0.0
 
         # Learning rate scheduler: Divide by 10 every 5 epochs
         # scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=5, gamma=0.1)
@@ -43,7 +44,7 @@ class BaseTrainer:
             print(f"{self.num_batches}/{self.num_batches} - Time Taken: {(end-start)/60:.2f} - train_loss: {train_loss:.4f} - train_accuracy: {train_accuracy*100:.4f}% - val_loss: {val_loss:.4f} - val_accuracy: {val_accuracy*100:.4f}%")
 
             # save model based on validation result
-            if val_accuracy >= best_acc:
+            if val_accuracy > best_acc:
                 best_acc = val_accuracy
                 torch.save({
                 'epoch': epoch+1,
@@ -54,7 +55,22 @@ class BaseTrainer:
                 'train_cm': train_cm,
                 'val_cm': val_cm,
                 'model':self.model,
-                }, 's3d_rgb_best.pth') 
+                }, 's3d_rgb_best.pth')
+
+            elif (val_accuracy==best_acc) and (train_accuracy >=best_train_acc):
+                best_acc = val_accuracy
+                best_train_acc = train_accuracy
+                torch.save({
+                'epoch': epoch+1,
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                'train': (train_loss, train_accuracy),
+                'val': (val_loss, val_accuracy),
+                'train_cm': train_cm,
+                'val_cm': val_cm,
+                'model':self.model,
+                }, 's3d_rgb_best.pth')
+
 
             # save latest model
             torch.save({
