@@ -282,7 +282,6 @@ def infer(model, loader, criterion, device: str):
 def ensemble(model1, model2, loader1, loader2, criterion, device: str):
     ''' return tuple with two items. raw outputs of models, and averaged
     combined outputs, for ensemble inferencing. '''
-    results = []
 
     outputs1, all_labels1, loss1, acc1, conf_matrix1 = infer(model1, loader1, criterion, device)
     outputs2, all_labels2, loss2, acc2, conf_matrix2 = infer(model2, loader2, criterion, device)
@@ -290,20 +289,9 @@ def ensemble(model1, model2, loader1, loader2, criterion, device: str):
     if all_labels1 == all_labels2:
         labels = torch.tensor(all_labels1).to(torch.long).to(device)
 
-    # print(len(outputs1))
-
-    # print(outputs1)
-    # print(all_labels1)
-
-    # print(outputs2)
-    # print(all_labels2)
-
-    combined_output = (torch.stack(outputs1)*0.3) + (torch.stack(outputs2)*0.7)
-    # print(combined_output)
+    combined_output = (torch.stack(outputs1)*0.5) + (torch.stack(outputs2)*0.5)
     
     _, predicted = torch.max(combined_output, 1)
-    # print(predicted)
-    # print(labels)
 
     loss = criterion(combined_output.to(torch.float32), labels)
     acc = (predicted == labels).sum().item() / len(labels)

@@ -194,7 +194,7 @@ def eval_s3d(dataset_path,batch_size,device,model_path):
 
     return train_loss, train_accuracy, train_cm ,val_loss, val_accuracy, val_cm
 
-def eval_sadtalker(dataset_path,batch_size,device,model_path):
+def eval_dataset(dataset_path,batch_size,device,model_path):
     # Set the random seed for reproducibility
     seed = 50  # You can choose any integer for your seed value
 
