@@ -289,7 +289,7 @@ def ensemble(model1, model2, loader1, loader2, criterion, device: str):
     if all_labels1 == all_labels2:
         labels = torch.tensor(all_labels1).to(torch.long).to(device)
 
-    combined_output = (torch.stack(outputs1)*0.5) + (torch.stack(outputs2)*0.5)
+    combined_output = (torch.stack(outputs1)*0.6) + (torch.stack(outputs2)*0.5)
     
     _, predicted = torch.max(combined_output, 1)
 

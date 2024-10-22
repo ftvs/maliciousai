@@ -56,7 +56,6 @@ def train_s3d(dataset_path,batch_size,device,epochs):
         # transforms.CenterCrop(256),
         transforms.Resize((256,256))
     ])
-    # transform = S3D_Weights.DEFAULT.transforms()
 
     # train_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_training_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
     # val_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
@@ -104,7 +103,7 @@ def train_s3d(dataset_path,batch_size,device,epochs):
     train_log, val_log = trainer.fit(epochs)
 
     return train_log, val_log
-    # return None,None
+
 
 def eval_s3d(dataset_path,batch_size,device,model_path):
     # Set the random seed for reproducibility
@@ -129,7 +128,6 @@ def eval_s3d(dataset_path,batch_size,device,model_path):
         # transforms.CenterCrop(256),
         transforms.Resize((256,256))
     ])
-    # transform = S3D_Weights.DEFAULT.transforms()
 
     # train_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_training_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
     # val_data = CelebDF2(dataset_path, transform=transform, max_frames=300, n_frames=150, file_list = 'List_of_testing_videos.txt') # 10s @ 30fps = 300 frames, sample 15 frames per 1s (60,100,150)
